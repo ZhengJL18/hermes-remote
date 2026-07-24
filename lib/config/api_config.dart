@@ -14,15 +14,19 @@ class ApiConfig {
   final String baseUrl;
   final String apiKey;
   final String model;
+  String? _lanUrl;
 
-  const ApiConfig({required this.baseUrl, required this.apiKey, required this.model});
+  ApiConfig({required this.baseUrl, required this.apiKey, required this.model});
 
   /// 从本地存储加载配置，没有则用默认值
   static Future<ApiConfig> load() async {
     final prefs = await SharedPreferences.getInstance();
     final url = prefs.getString('api_url') ?? _candidates.last;
     final key = prefs.getString('api_key') ?? defaultApiKey;
-    return ApiConfig(baseUrl: url, apiKey: key, model: defaultModel);
+    final lanUrl = prefs.getString('lan_url');  // 局域网地址
+    final config = ApiConfig(baseUrl: url, apiKey: key, model: defaultModel);
+    config._lanUrl = lanUrl;
+    return config;
   }
 
   factory ApiConfig.defaults() {
@@ -33,9 +37,11 @@ class ApiConfig {
   static Future<String> probe({String? preferUrl}) async {
     final candidates = <String>[];
     if (preferUrl != null) candidates.add(preferUrl);
-    // 加载保存的 URL
+    // 加载保存的地址
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('api_url');
+    final savedLan = prefs.getString('lan_url');
+    if (savedLan != null && savedLan.isNotEmpty) candidates.add(savedLan);
     if (savedUrl != null && !candidates.contains(savedUrl)) candidates.add(savedUrl);
     candidates.addAll(_candidates.where((c) => !candidates.contains(c)));
 

@@ -44,7 +44,7 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   void startRelayPoll(WidgetRef ref) {
     _relay.heartbeat();
     _relayPollTimer?.cancel();
-    _relayPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _relayPollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       _relay.heartbeat();
       final replies = await _relay.fetch(sessionId: _currentSessionId);
       for (final r in replies) {
@@ -243,7 +243,7 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   void startPolling(String sessionId, WidgetRef ref) {
     _pollSessionId = sessionId;
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       try {
         final allMessages = await _api.getSessionMessages(sessionId, limit: 1);
         if (allMessages.length > _lastMessageCount) {

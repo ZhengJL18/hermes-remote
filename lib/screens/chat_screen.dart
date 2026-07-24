@@ -29,9 +29,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    // 启动时探测最快通道
     _probeChannel();
+    _rttTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshRtt());
   }
+
+  Timer? _rttTimer;
 
   Future<void> _probeChannel() async {
     // 先加载本地保存的配置
@@ -168,6 +170,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
+    _rttTimer?.cancel();
     super.dispose();
   }
 
@@ -284,46 +287,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
 
-          // 同步状态条 — 状态灯 + 延迟 + 丢包 + 刷新
-          if (sessionId != null)
-            Builder(builder: (ctx) {
-              ref.watch(connectionStatsProvider);
-              ref.watch(connectionStateProvider);
-              _maybeRefreshRtt();
-              final stats = ref.read(connectionStatsProvider);
-              final rtt = stats['rtt'] as int? ?? 0;
-              final loss = stats['loss'] as String? ?? '';
-              final lossText = loss.isNotEmpty ? ' · 丢包 $loss' : '';
-              final connState = ref.read(connectionStateProvider);
-              final dotColor = connState == GatewayState.open ? const Color(0xFF00BB7F)
-                  : connState == GatewayState.connecting ? const Color(0xFFFF9800)
-                  : const Color(0xFFFF3333);
-              final dotLabel = connState == GatewayState.open ? (rtt > 0 ? '${rtt}ms' : '在线')
-                  : connState == GatewayState.connecting ? '连接中'
-                  : '离线';
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Row(
-                  children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text(dotLabel, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-                    if (rtt > 0 && connState == GatewayState.open) ...[
-                      Text(' · ${rtt}ms', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6))),
-                    ],
-                    if (lossText.isNotEmpty)
-                      Text(lossText, style: TextStyle(fontSize: 11, color: const Color(0xFFFF3333))),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: _refresh,
-                      child: const Icon(Icons.refresh, size: 14, color: Color(0xFF9E9E9E)),
-                    ),
-                  ],
-                ),
-              );
-            }),
-
           // 生成中 — 工具调用状态 + 停止按钮
           if (isGenerating)
             _GeneratingBar(
@@ -345,7 +308,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _buildInputBar(theme),
         ],
       ),
+      backgroundColor: theme.colorScheme.surface,
+      bottomNavigationBar: Consumer(builder: (context, ref, _) {
+        ref.watch(connectionStatsProvider);
+        ref.watch(connectionStateProvider);
+        final stats = ref.read(connectionStatsProvider);
+        final rtt = stats['rtt'] as int? ?? 0;
+        final loss = stats['loss'] as String? ?? '';
+        final lossText = loss.isNotEmpty ? ' - $loss' : '';
+        final connState = ref.read(connectionStateProvider);
+        final dotColor = connState == GatewayState.open ? const Color(0xFF00BB7F)
+            : connState == GatewayState.connecting ? const Color(0xFFFF9800)
+            : const Color(0xFFFF3333);
+        final dotLabel = connState == GatewayState.open ? (rtt > 0 ? '${rtt}ms' : 'online')
+            : connState == GatewayState.connecting ? 'connecting'
+            : 'offline';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(color: theme.colorScheme.surface,
+            border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)))),
+          child: SafeArea(top: false, child: Row(children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text(dotLabel, style: const TextStyle(fontSize: 11)),
+            if (rtt > 0 && connState == GatewayState.open)
+              Text(' - ${rtt}ms', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
+            if (lossText.isNotEmpty)
+              Text(lossText, style: const TextStyle(fontSize: 11, color: Color(0xFFFF3333))),
+            const Spacer(),
+            IconButton(icon: const Icon(Icons.add_comment_outlined, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _newSession),
+            const SizedBox(width: 12),
+            IconButton(icon: const Icon(Icons.refresh, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _refresh),
+          ])),
+        );
+      }),
     );
+  }
+
+  void _newSession() {
+    ref.read(sessionIdProvider.notifier).state = null;
+    ref.read(messagesProvider.notifier).clear();
   }
 
   Widget _buildEmptyState(ThemeData theme) {
