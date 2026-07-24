@@ -1,0 +1,24 @@
+name: hermes_flutter
+description: Hermes Agent 移动端控制台 - 远程操控你的 Hermes AI 助手
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  flutter_markdown: ^0.7.1
+  url_launcher: ^6.2.5
+  shared_preferences: ^2.2.3
+  path_provider: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

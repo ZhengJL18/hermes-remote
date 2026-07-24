@@ -1,0 +1,26 @@
+# Flutter
+.dart_tool/
+.packages
+build/
+*.iml
+.idea/
+.vscode/
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/key.properties
+
+# Dependencies
+**/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive
+*.key
+*.pem
+.env
+state.db
