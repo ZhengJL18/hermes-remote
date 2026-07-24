@@ -338,6 +338,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             const Spacer(),
             IconButton(icon: const Icon(Icons.add_comment_outlined, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _newSession),
             const SizedBox(width: 12),
+            IconButton(icon: const Icon(Icons.list_alt, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _showSessionQuestions),
+            const SizedBox(width: 12),
             IconButton(icon: const Icon(Icons.refresh, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _refresh),
           ])),
         );
@@ -348,6 +350,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _newSession() {
     ref.read(sessionIdProvider.notifier).state = null;
     ref.read(messagesProvider.notifier).clear();
+  }
+
+  void _showSessionQuestions() {
+    final messages = ref.read(messagesProvider);
+    final questions = <Map<String, dynamic>>[];
+    for (int i = 0; i < messages.length; i++) {
+      if (messages[i].role == MessageRole.user) {
+        questions.add({'index': i, 'content': messages[i].content});
+      }
+    }
+    if (questions.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+            Text('当前会话 (${questions.length}个问题)', style: Theme.of(context).textTheme.titleMedium),
+            const Spacer(),
+            IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(context)),
+          ])),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: questions.length,
+              itemBuilder: (_, i) => ListTile(
+                dense: true,
+                leading: Text('${i + 1}', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                title: Text(questions[i]['content'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(context);
+                  final idx = questions[i]['index'] as int;
+                  _scrollController.animateTo(idx * 80.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                },
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   Widget _buildEmptyState(ThemeData theme) {
