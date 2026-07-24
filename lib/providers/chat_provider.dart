@@ -204,6 +204,23 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     }
   }
 
+  /// 预加载最近会话的消息到本地缓存
+  Future<void> preloadRecentSessions(WidgetRef ref) async {
+    final db = ref.read(dbProvider);
+    final sessions = await db.getSessions();
+    // 缓存最近 5 条会话的消息
+    for (int i = 0; i < sessions.length && i < 5; i++) {
+      final sid = sessions[i]['id'] as String;
+      try {
+        final cloudMsgs = await _api.getSessionMessages(sid, limit: 200);
+        final parsed = _parseMessages(cloudMsgs, sid);
+        if (parsed.isNotEmpty) {
+          await db.saveMessages(sid, parsed);
+        }
+      } catch (_) {}
+    }
+  }
+
   Future<void> _saveCache(String sessionId, List<ChatMessage> msgs) async {
     final prefs = await SharedPreferences.getInstance();
     final json = msgs.map((m) => jsonEncode({

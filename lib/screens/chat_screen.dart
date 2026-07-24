@@ -64,6 +64,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(messagesProvider.notifier).tryFlushPending(ref);
       // 同步会话列表到本地数据库
       ref.read(messagesProvider.notifier).syncSessions();
+      // 预加载最近会话的消息到本地缓存（离线秒开用）
+      ref.read(messagesProvider.notifier).preloadRecentSessions(ref);
       final lastSid = ref.read(sessionIdProvider);
       final msgs = ref.read(messagesProvider);
       if (lastSid != null && msgs.isEmpty) {
