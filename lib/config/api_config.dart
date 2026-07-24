@@ -79,7 +79,7 @@ class ApiConfig {
         return result.$1;
       }
     }
-    return _candidates.isNotEmpty ? (_fastest ?? _candidates.last) : '';
+    throw Exception('Hermes: 所有通道均无法连接');
   }
 
   static String? _fastest;
