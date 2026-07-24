@@ -30,6 +30,8 @@ final hasMoreProvider = StateProvider<bool>((ref) => false);
 final pendingCountProvider = StateProvider<int>((ref) => 0);
 /// 配置版本号 — Settings保存后递增，通知 chat_screen 重新探测
 final configVersionProvider = StateProvider<int>((ref) => 0);
+/// 电脑状态（来自 relay）：online, busy, queue_depth
+final relayStatusProvider = StateProvider<Map<String, dynamic>>((ref) => {});
 
 class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   final HermesApi _api;
@@ -54,6 +56,10 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     _relayPollTimer?.cancel();
     _relayPollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       _relay.heartbeat();
+      // 获取电脑状态
+      final st = await _relay.status();
+      ref.read(relayStatusProvider.notifier).state = st;
+      // 获取回复
       final replies = await _relay.fetch(sessionId: _currentSessionId);
       for (final r in replies) {
         if (r['role'] == 'assistant' && r['content'] != null) {

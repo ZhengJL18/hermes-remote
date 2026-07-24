@@ -332,13 +332,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           final connState = ref.read(connectionStateProvider);
           final dot = connState == GatewayState.open ? '🟢' : connState == GatewayState.connecting ? '🟠' : '🔴';
           final stateText = connState == GatewayState.open ? '在线' : connState == GatewayState.connecting ? '连接中' : '离线';
+
+          // 获取 relay 电脑状态
+          final relaySt = ref.read(relayStatusProvider);
+          final computer = relaySt['computer'] as Map<String, dynamic>?;
+          final pcOnline = computer?['online'] == true;
+          final pcBusy = computer?['busy'] == true;
+          final queueDepth = relaySt['queue']?['inbox'] ?? 0;
+
           return Container(
-            width: 200,
+            width: 220,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('$dot $stateText', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               if (rtt > 0) Text('延迟 ${rtt}ms', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
               if (loss.isNotEmpty) Text('丢包 ${loss}%', style: const TextStyle(fontSize: 12, color: Color(0xFFFF3333))),
+              if (pcOnline) const SizedBox(height: 4),
+              if (pcOnline) Text(pcBusy ? '💻 电脑忙碌中' : '💻 电脑在线', style: TextStyle(fontSize: 12, color: pcBusy ? const Color(0xFFFF9800) : const Color(0xFF4CAF50))),
+              if (queueDepth > 0) Text('📨 ${queueDepth}条消息排队', style: const TextStyle(fontSize: 12, color: Color(0xFFFF9800))),
               const Divider(height: 12),
             ]),
           );

@@ -38,6 +38,7 @@ class RelayClient {
     } catch (_) { return []; }
   }
 
+  /// 获取完整状态：电脑在线/忙碌 + 队列深度
   Future<Map<String, dynamic>> status() async {
     try {
       final c = HttpClient()..connectionTimeout = const Duration(seconds: 5);
