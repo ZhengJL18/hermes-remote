@@ -240,11 +240,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _buildMenu(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: _newSession,
-        tooltip: '新对话',
-        child: const Icon(Icons.edit_note),
-      ),
       body: Column(
         children: [
           // 主消息区 — 支持下拉刷新
@@ -319,6 +314,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       tooltip: '菜单',
       onSelected: (v) {
         switch (v) {
+          case 'new_chat': _newSession(); break;
           case 'questions': _showSessionQuestions();
           case 'refresh': _refresh();
           case 'export': _exportChat();
@@ -347,6 +343,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ]),
           );
         })),
+        const PopupMenuItem(value: 'new_chat', child: ListTile(leading: Icon(Icons.edit_note, size: 20), title: Text('新对话'), dense: true)),
         const PopupMenuItem(value: 'questions', child: ListTile(leading: Icon(Icons.list_alt, size: 20), title: Text('当前会话'), dense: true)),
         const PopupMenuItem(value: 'refresh',  child: ListTile(leading: Icon(Icons.refresh, size: 20), title: Text('同步'), dense: true)),
         const PopupMenuItem(value: 'export',  child: ListTile(leading: Icon(Icons.save_alt, size: 20), title: Text('导出'), dense: true)),
