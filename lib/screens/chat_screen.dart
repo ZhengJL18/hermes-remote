@@ -183,6 +183,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       sessionId: sessionId,
       ref: ref,
     );
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -208,7 +209,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听配置变更（Settings保存后递增版本号，触发重新探测）
+    // 监听配置变更（Settings保存后增量触发重新探测）
     ref.listen(configVersionProvider, (prev, next) {
       if (prev != null && next > prev) {
         _probeChannel();
@@ -219,19 +220,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final isGenerating = ref.watch(isGeneratingProvider);
     final sessionId = ref.watch(sessionIdProvider);
     final theme = Theme.of(context);
-
-    // 不自动加载 —— 用户自行点击历史选择会话
-    if (!_initialSyncDone) {
-      _initialSyncDone = true;
-      // 仅同步最新消息计数，不加载内容
-    }
-
-    // 最后一条消息变化 = 新消息到达 → 滚到底部
-    ref.listen(messagesProvider, (prev, next) {
-      if (next.isNotEmpty && (prev == null || prev.isEmpty || prev.last.id != next.last.id)) {
-        _scrollToBottom();
-      }
-    });
 
     return Scaffold(
       appBar: AppBar(
