@@ -14,8 +14,12 @@ class HermesApi {
   HermesApi() : config = ApiConfig.defaults();
 
   /// 动态切换通道（局域网/P2P/云服务器）
-  void setBaseUrl(String url) {
-    config = ApiConfig(baseUrl: url, apiKey: config.apiKey, model: config.model);
+  void setBaseUrl(String url, {String? apiKey}) {
+    config = ApiConfig(
+      baseUrl: url,
+      apiKey: apiKey ?? config.apiKey,
+      model: config.model,
+    );
   }
 
   HttpClient get _http {

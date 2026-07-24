@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import '../config/api_config.dart';
 
 class RelayClient {
   final String baseUrl;
-  static const _apiKey = 'YOUR_RELAY_KEY';
+  static const _apiKey = ApiConfig.defaultRelayKey;
 
-  RelayClient({this.baseUrl = 'http://YOUR_SERVER_IP/relay'});
+  RelayClient({this.baseUrl = ApiConfig.defaultRelayUrl});
 
   void _setHeaders(HttpClientRequest r) {
     r.headers.set('X-API-Key', _apiKey);

@@ -3,13 +3,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Hermes API 配置 — 多通道自动切换
 class ApiConfig {
+  /// ▼ 单点配置（占位符）：首次使用请在 Settings 填写实际值 ▼
+  /// 保存后 SharedPreferences 持久化，不再读取此处的占位符
   static const _candidates = [
-    'http://YOUR_LAN_IP:8642/v1',
-    'http://YOUR_SERVER_IP/hermes/v1',
+    'http://YOUR_LAN_IP:8642/v1',     // [0] 局域网直连
+    'http://YOUR_SERVER_IP/hermes/v1', // [1] 云端通道（默认）
   ];
 
-  static const String defaultApiKey = 'YOUR_API_KEY';
+  /// 默认 API Key（占位符）— 在 Settings 中设置并保存
+  static const String defaultApiKey = 'your-api-key-here';
   static const String defaultModel = 'hermes-agent';
+  /// 默认 Relay 地址（占位符）
+  static const String defaultRelayUrl = 'http://YOUR_SERVER_IP/relay';
+  static const String defaultRelayKey = 'your-relay-key-here';
 
   final String baseUrl;
   final String apiKey;
@@ -17,6 +23,11 @@ class ApiConfig {
   String? _lanUrl;
 
   ApiConfig({required this.baseUrl, required this.apiKey, required this.model});
+
+  /// 默认远程地址（云端通道）
+  static String get defaultUrl => _candidates.last;
+  /// 默认局域网地址
+  static String get defaultLanUrl => _candidates.first;
 
   /// 从本地存储加载配置，没有则用默认值
   static Future<ApiConfig> load() async {

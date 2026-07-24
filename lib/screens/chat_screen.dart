@@ -54,7 +54,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (mounted) {
         final root = best.replaceAll('/v1', '');
         ref.read(baseUrlProvider.notifier).state = root;
-        ref.read(apiProvider).setBaseUrl(best);
+        ref.read(apiProvider).setBaseUrl(best, apiKey: saved.apiKey);
         ref.read(connectionStatsProvider.notifier).state = {'rtt': rtt, 'loss': ''};
       }
 
@@ -93,7 +93,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       try {
         final c = HttpClient()..connectionTimeout = const Duration(seconds: 2);
         final r = await c.getUrl(Uri.parse('$baseUrl/health'));
-        r.headers.set('Authorization', 'Bearer YOUR_API_KEY');
+        r.headers.set('Authorization', 'Bearer ${ref.read(apiProvider).config.apiKey}');
         final resp = await r.close().timeout(const Duration(seconds: 2));
         c.close();
         return resp.statusCode == 200;
@@ -102,7 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     for (final f in futures) { if (await f) ok++; }
     if (mounted) {
       final rtt = stopwatch.elapsedMilliseconds ~/ 3;
-      final loss = ok < 3 ? '${((3 - ok) / 3 * 100).round()}%' : '';
+      final loss = ok < 3 ? '${((3 - ok) / 3 * 100).round()}' : '';
       ref.read(connectionStatsProvider.notifier).state = {'rtt': rtt, 'loss': loss};
       _lastProbeTime = DateTime.now();
     }
@@ -115,7 +115,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       try {
         final c = HttpClient()..connectionTimeout = const Duration(seconds: 1);
         final r = await c.getUrl(Uri.parse('$root/health'));
-        r.headers.set('Authorization', 'Bearer YOUR_API_KEY');
+        r.headers.set('Authorization', 'Bearer ${ref.read(apiProvider).config.apiKey}');
         final resp = await r.close().timeout(const Duration(seconds: 1));
         c.close();
         if (resp.statusCode == 200) return true;
@@ -126,7 +126,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (await f) ok++;
     }
     if (mounted) {
-      final loss = ok < 5 ? '${((5 - ok) / 5 * 100).round()}%' : '';
+      final loss = ok < 3 ? '${((3 - ok) / 3 * 100).round()}' : '';
       final prev = ref.read(connectionStatsProvider);
       ref.read(connectionStatsProvider.notifier).state = {'rtt': prev['rtt'], 'loss': loss};
     }

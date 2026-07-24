@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/chat_message.dart';
+import '../config/api_config.dart';
 import '../services/hermes_api.dart';
 import '../services/relay_client.dart';
 import '../services/connection_manager.dart';
@@ -11,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 final relayProvider = Provider<RelayClient>((ref) => RelayClient());
 
 final apiProvider = Provider<HermesApi>((ref) => HermesApi());
-final baseUrlProvider = StateProvider<String>((ref) => 'http://YOUR_SERVER_IP/hermes/v1');
+final baseUrlProvider = StateProvider<String>((ref) => ApiConfig.defaultUrl);
 final connectionStateProvider = StateProvider<GatewayState>((ref) => GatewayState.idle);
 final connectionStatsProvider = StateProvider<Map<String, dynamic>>((ref) => {'rtt': 0, 'loss': ''});
 final connectionManagerProvider = Provider<ConnectionManager>((ref) => ConnectionManager());

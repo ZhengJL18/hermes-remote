@@ -42,7 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await prefs.setString('relay_key', _relayKeyCtrl.text.trim());
     if (mounted) {
       ref.read(baseUrlProvider.notifier).state = _urlCtrl.text.trim();
-      ref.read(apiProvider).setBaseUrl(_urlCtrl.text.trim());
+      ref.read(apiProvider).setBaseUrl(_urlCtrl.text.trim(), apiKey: _keyCtrl.text.trim());
       Navigator.pop(context);
     }
   }
@@ -70,14 +70,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ])),
         Flexible(child: ListView(shrinkWrap: true, children: [
           _section('Hermes 连接'),
-          _field('局域网地址', 'http://192.168.x.x:8642/v1', _lanUrlCtrl),
+          _field('局域网地址', ApiConfig.defaultLanUrl, _lanUrlCtrl),
           const SizedBox(height: 10),
-          _field('远程地址', 'http://host:port/hermes/v1', _urlCtrl),
+          _field('远程地址', ApiConfig.defaultUrl, _urlCtrl),
           const SizedBox(height: 10),
           _field('API Key', 'hermes-api-key', _keyCtrl, obscure: true),
           const SizedBox(height: 4),
           _section('Relay 中继'),
-          _field('Relay 地址', 'http://host:port/relay', _relayUrlCtrl),
+          _field('Relay 地址', ApiConfig.defaultRelayUrl, _relayUrlCtrl),
           const SizedBox(height: 10),
           _field('Relay Key', 'relay-key', _relayKeyCtrl, obscure: true),
           const SizedBox(height: 4),
