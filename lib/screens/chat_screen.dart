@@ -229,38 +229,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Consumer(builder: (_, ref, __) {
-          ref.watch(connectionStatsProvider);
-          ref.watch(connectionStateProvider);
-          final stats = ref.read(connectionStatsProvider);
-          final rtt = stats['rtt'] as int? ?? 0;
-          final loss = stats['loss'] as String? ?? '';
-          final connState = ref.read(connectionStateProvider);
-          final dot = connState == GatewayState.open ? '🟢' : connState == GatewayState.connecting ? '🟠' : '🔴';
-          final rttText = rtt > 0 ? ' $rtt' : '';
-          final lossText = loss.isNotEmpty ? ' ↓${loss}%' : '';
-          return Text('$dot Hermes$rttText$lossText', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
-        }),
+        title: const Text('Hermes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(icon: const Icon(Icons.edit_note), tooltip: '新对话', onPressed: _newSession),
-          PopupMenuButton<String>(
-            tooltip: '更多',
-            icon: const Icon(Icons.more_vert),
-            onSelected: (v) async {
-              switch (v) {
-                case 'questions': _showSessionQuestions();
-                case 'refresh': _refresh();
-                case 'history': await Navigator.push(context, MaterialPageRoute(builder: (_) => const SessionListScreen()));
-                case 'settings': showModalBottomSheet(context: context, isScrollControlled: true, useSafeArea: true, builder: (_) => const SettingsScreen());
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'questions', child: ListTile(leading: Icon(Icons.list_alt, size: 20), title: Text('当前会话'), dense: true)),
-              PopupMenuItem(value: 'refresh',  child: ListTile(leading: Icon(Icons.refresh, size: 20), title: Text('同步'), dense: true)),
-              PopupMenuItem(value: 'history',  child: ListTile(leading: Icon(Icons.history, size: 20), title: Text('会话历史'), dense: true)),
-              PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings, size: 20), title: Text('设置'), dense: true)),
-            ],
-          ),
+          _buildMenu(),
         ],
       ),
       body: Column(
@@ -319,6 +291,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _newSession() {
     ref.read(sessionIdProvider.notifier).state = null;
     ref.read(messagesProvider.notifier).clear();
+  }
+
+  Widget _buildMenu() {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert),
+      tooltip: '菜单',
+      onSelected: (v) {
+        switch (v) {
+          case 'questions': _showSessionQuestions();
+          case 'refresh': _refresh();
+          case 'history': Navigator.push(context, MaterialPageRoute(builder: (_) => const SessionListScreen()));
+          case 'settings': showModalBottomSheet(context: context, isScrollControlled: true, useSafeArea: true, builder: (_) => const SettingsScreen());
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<String>(enabled: false, child: Consumer(builder: (_, ref, __) {
+          ref.watch(connectionStatsProvider);
+          ref.watch(connectionStateProvider);
+          final stats = ref.read(connectionStatsProvider);
+          final rtt = stats['rtt'] as int? ?? 0;
+          final loss = stats['loss'] as String? ?? '';
+          final connState = ref.read(connectionStateProvider);
+          final dot = connState == GatewayState.open ? '🟢' : connState == GatewayState.connecting ? '🟠' : '🔴';
+          final stateText = connState == GatewayState.open ? '在线' : connState == GatewayState.connecting ? '连接中' : '离线';
+          return Container(
+            width: 200,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('$dot $stateText', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              if (rtt > 0) Text('延迟 ${rtt}ms', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+              if (loss.isNotEmpty) Text('丢包 ${loss}%', style: const TextStyle(fontSize: 12, color: Color(0xFFFF3333))),
+              const Divider(height: 12),
+            ]),
+          );
+        })),
+        const PopupMenuItem(value: 'questions', child: ListTile(leading: Icon(Icons.list_alt, size: 20), title: Text('当前会话'), dense: true)),
+        const PopupMenuItem(value: 'refresh',  child: ListTile(leading: Icon(Icons.refresh, size: 20), title: Text('同步'), dense: true)),
+        const PopupMenuItem(value: 'history',  child: ListTile(leading: Icon(Icons.history, size: 20), title: Text('会话历史'), dense: true)),
+        const PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings, size: 20), title: Text('设置'), dense: true)),
+      ],
+    );
   }
 
   void _showSessionQuestions() {
