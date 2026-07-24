@@ -301,6 +301,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.read(messagesProvider.notifier).clear();
   }
 
+  Future<void> _exportChat() async {
+    final path = await ref.read(messagesProvider.notifier).exportSession();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(path != null ? '已保存: $path' : '导出失败'),
+        duration: const Duration(seconds: 2),
+      ));
+    }
+  }
+
   Widget _buildMenu() {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
@@ -309,6 +319,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         switch (v) {
           case 'questions': _showSessionQuestions();
           case 'refresh': _refresh();
+          case 'export': _exportChat();
           case 'history': Navigator.push(context, MaterialPageRoute(builder: (_) => const SessionListScreen()));
           case 'settings': showModalBottomSheet(context: context, isScrollControlled: true, useSafeArea: true, builder: (_) => const SettingsScreen());
         }
@@ -336,6 +347,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         })),
         const PopupMenuItem(value: 'questions', child: ListTile(leading: Icon(Icons.list_alt, size: 20), title: Text('当前会话'), dense: true)),
         const PopupMenuItem(value: 'refresh',  child: ListTile(leading: Icon(Icons.refresh, size: 20), title: Text('同步'), dense: true)),
+        const PopupMenuItem(value: 'export',  child: ListTile(leading: Icon(Icons.save_alt, size: 20), title: Text('导出'), dense: true)),
         const PopupMenuItem(value: 'history',  child: ListTile(leading: Icon(Icons.history, size: 20), title: Text('会话历史'), dense: true)),
         const PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings, size: 20), title: Text('设置'), dense: true)),
       ],

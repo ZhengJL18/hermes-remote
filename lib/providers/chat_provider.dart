@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/chat_message.dart';
 import '../config/api_config.dart';
@@ -191,6 +194,47 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
         timestamp: DateTime.fromMillisecondsSinceEpoch(j['timestamp'] ?? 0),
       )).toList();
     } catch (_) { return []; }
+  }
+
+  /// 导出当前会话为 Markdown 文件到 Downloads
+  Future<String?> exportSession() async {
+    if (_currentSessionId == null || state.isEmpty) return null;
+    try {
+      final dir = await getDownloadsDirectory();
+      if (dir == null) return null;
+      final buf = StringBuffer();
+      final now = DateTime.now();
+      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final timeStr = '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      buf.writeln('# Hermes Chat Export');
+      buf.writeln('> Session: $_currentSessionId');
+      buf.writeln('> Exported: $dateStr $timeStr');
+      buf.writeln();
+
+      for (final msg in state) {
+        if (msg.role == MessageRole.user) {
+          buf.writeln('## You');
+          buf.writeln(msg.content);
+          buf.writeln();
+        } else if (msg.role == MessageRole.assistant) {
+          if (msg.content == '☁️ 排队中...') continue;
+          buf.writeln('## Hermes');
+          buf.writeln(msg.content);
+          buf.writeln();
+        } else if (msg.role == MessageRole.tool) {
+          buf.writeln('### 🔧 ${msg.toolName ?? "Tool"}');
+          buf.writeln('```');
+          buf.writeln(msg.content.length > 500 ? '${msg.content.substring(0, 500)}...' : msg.content);
+          buf.writeln('```');
+          buf.writeln();
+        }
+      }
+
+      final filename = 'hermes_chat_$dateStr-$timeStr.md';
+      final file = File('${dir.path}/$filename');
+      await file.writeAsString(buf.toString());
+      return file.path;
+    } catch (_) { return null; }
   }
 
   Future<void> loadMore(WidgetRef ref) async {
