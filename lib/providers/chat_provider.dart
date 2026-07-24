@@ -221,6 +221,13 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     }
   }
 
+  /// 获取最近使用的会话 ID
+  Future<String?> getMostRecentSessionId() async {
+    final db = ChatDatabase();
+    final sessions = await db.getSessions();
+    return sessions.isNotEmpty ? sessions.first['id'] as String? : null;
+  }
+
   Future<void> _saveCache(String sessionId, List<ChatMessage> msgs) async {
     final prefs = await SharedPreferences.getInstance();
     final json = msgs.map((m) => jsonEncode({

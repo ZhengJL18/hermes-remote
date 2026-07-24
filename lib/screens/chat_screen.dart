@@ -66,10 +66,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(messagesProvider.notifier).syncSessions();
       // 预加载最近会话的消息到本地缓存（离线秒开用）
       ref.read(messagesProvider.notifier).preloadRecentSessions(ref);
+      
+      // 自动打开最近的会话，滚到底部
       final lastSid = ref.read(sessionIdProvider);
-      final msgs = ref.read(messagesProvider);
-      if (lastSid != null && msgs.isEmpty) {
-        await ref.read(messagesProvider.notifier).loadSession(lastSid, ref: ref);
+      final sidToLoad = lastSid ?? await ref.read(messagesProvider.notifier).getMostRecentSessionId();
+      if (sidToLoad != null) {
+        ref.read(sessionIdProvider.notifier).state = sidToLoad;
+        await ref.read(messagesProvider.notifier).loadSession(sidToLoad, ref: ref);
         _scrollToBottom();
       }
 
