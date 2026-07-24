@@ -31,14 +31,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollController.addListener(_onScroll);
     _probeChannel();
     _rttTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshRtt());
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
     // 监听配置变更（Settings保存后递增版本号，触发重新探测）
     ref.listen(configVersionProvider, (prev, next) {
       if (prev != null && next > prev) {
+        debugPrint('[Hermes] configVersion changed: $prev -> $next, re-probing...');
         _probeChannel();
       }
     });
