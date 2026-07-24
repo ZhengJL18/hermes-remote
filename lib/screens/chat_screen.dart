@@ -112,19 +112,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _measureLoss(String url) async {
     final root = url.replaceAll('/v1', '');
     int ok = 0;
-    final futures = List.generate(3, (_) async {
+    // 串行测试，避免移动网络并发连接冲突
+    for (int i = 0; i < 3; i++) {
       try {
         final c = HttpClient()..connectionTimeout = const Duration(seconds: 3);
-        final r = await c.getUrl(Uri.parse('$root/health'));
-        r.headers.set('Authorization', 'Bearer ${ref.read(apiProvider).config.apiKey}');
-        final resp = await r.close().timeout(const Duration(seconds: 3));
+        final req = await c.getUrl(Uri.parse('$root/health'));
+        final resp = await req.close().timeout(const Duration(seconds: 3));
         c.close();
-        if (resp.statusCode == 200) return true;
+        if (resp.statusCode == 200) ok++;
       } catch (_) {}
-      return false;
-    });
-    for (final f in futures) {
-      if (await f) ok++;
     }
     if (mounted) {
       final loss = ok < 3 ? '${((3 - ok) / 3 * 100).round()}' : '';
@@ -239,9 +235,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: const Text('Hermes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
-          IconButton(icon: const Icon(Icons.edit_note), tooltip: '新对话', onPressed: _newSession),
           _buildMenu(),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: _newSession,
+        tooltip: '新对话',
+        child: const Icon(Icons.edit_note),
       ),
       body: Column(
         children: [

@@ -78,11 +78,11 @@ class SessionListScreen extends ConsumerWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.chevron_right),
-                onTap: () {
+                onTap: () async {
                   ref.read(sessionIdProvider.notifier).state = id;
-                  ref.read(messagesProvider.notifier).loadSession(id, ref: ref);
+                  await ref.read(messagesProvider.notifier).loadSession(id, ref: ref);
                   ref.read(messagesProvider.notifier).startPolling(id, ref);
-                  Navigator.pop(context);
+                  if (context.mounted) Navigator.pop(context);
                 },
               );
             },
