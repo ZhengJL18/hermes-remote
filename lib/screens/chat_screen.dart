@@ -315,14 +315,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final stats = ref.read(connectionStatsProvider);
         final rtt = stats['rtt'] as int? ?? 0;
         final loss = stats['loss'] as String? ?? '';
-        final lossText = loss.isNotEmpty ? ' - $loss' : '';
         final connState = ref.read(connectionStateProvider);
         final dotColor = connState == GatewayState.open ? const Color(0xFF00BB7F)
             : connState == GatewayState.connecting ? const Color(0xFFFF9800)
             : const Color(0xFFFF3333);
-        final dotLabel = connState == GatewayState.open ? (rtt > 0 ? '${rtt}ms' : 'online')
-            : connState == GatewayState.connecting ? 'connecting'
-            : 'offline';
+        final dotLabel = connState == GatewayState.open ? (rtt > 0 ? '${rtt}ms' : '在线')
+            : connState == GatewayState.connecting ? '连接中'
+            : '离线';
+        final lossText = loss.isNotEmpty ? ' 丢包$loss' : '';
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(color: theme.colorScheme.surface,
@@ -330,17 +330,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           child: SafeArea(top: false, child: Row(children: [
             Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
             const SizedBox(width: 6),
-            Text(dotLabel, style: const TextStyle(fontSize: 11)),
+            Text('$dotLabel$lossText', style: const TextStyle(fontSize: 11)),
             if (rtt > 0 && connState == GatewayState.open)
-              Text(' - ${rtt}ms', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            if (lossText.isNotEmpty)
-              Text(lossText, style: const TextStyle(fontSize: 11, color: Color(0xFFFF3333))),
+              Text(' · ${rtt}ms', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
             const Spacer(),
-            IconButton(icon: const Icon(Icons.add_comment_outlined, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _newSession),
-            const SizedBox(width: 12),
-            IconButton(icon: const Icon(Icons.list_alt, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _showSessionQuestions),
-            const SizedBox(width: 12),
-            IconButton(icon: const Icon(Icons.refresh, size: 18), padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _refresh),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz, size: 20),
+              padding: EdgeInsets.zero,
+              onSelected: (v) {
+                if (v == 'new') _newSession();
+                else if (v == 'questions') _showSessionQuestions();
+                else if (v == 'refresh') _refresh();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'new', child: ListTile(leading: Icon(Icons.add_comment_outlined, size: 18), title: Text('新对话', style: TextStyle(fontSize: 13)), dense: true, contentPadding: EdgeInsets.zero)),
+                const PopupMenuItem(value: 'questions', child: ListTile(leading: Icon(Icons.list_alt, size: 18), title: Text('当前会话', style: TextStyle(fontSize: 13)), dense: true, contentPadding: EdgeInsets.zero)),
+                const PopupMenuItem(value: 'refresh', child: ListTile(leading: Icon(Icons.refresh, size: 18), title: Text('刷新', style: TextStyle(fontSize: 13)), dense: true, contentPadding: EdgeInsets.zero)),
+              ],
+            ),
           ])),
         );
       }),
