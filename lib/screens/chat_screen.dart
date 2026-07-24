@@ -114,10 +114,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     int ok = 0;
     final futures = List.generate(3, (_) async {
       try {
-        final c = HttpClient()..connectionTimeout = const Duration(seconds: 1);
+        final c = HttpClient()..connectionTimeout = const Duration(seconds: 3);
         final r = await c.getUrl(Uri.parse('$root/health'));
         r.headers.set('Authorization', 'Bearer ${ref.read(apiProvider).config.apiKey}');
-        final resp = await r.close().timeout(const Duration(seconds: 1));
+        final resp = await r.close().timeout(const Duration(seconds: 3));
         c.close();
         if (resp.statusCode == 200) return true;
       } catch (_) {}
