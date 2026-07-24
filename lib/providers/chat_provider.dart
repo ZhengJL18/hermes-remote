@@ -23,6 +23,8 @@ final isGeneratingProvider = StateProvider<bool>((ref) => false);
 final sessionIdProvider = StateProvider<String?>((ref) => null);
 final hasMoreProvider = StateProvider<bool>((ref) => false);
 final pendingCountProvider = StateProvider<int>((ref) => 0);
+/// 配置版本号 — Settings保存后递增，通知 chat_screen 重新探测
+final configVersionProvider = StateProvider<int>((ref) => 0);
 
 class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   final HermesApi _api;

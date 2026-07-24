@@ -94,7 +94,7 @@ class HermesApi {
   }
 
   /// 获取会话列表
-  Future<List<Map<String, dynamic>>> getSessions() async {
+  Future<List<Map<String, dynamic>>> getSessions({bool throwOnError = false}) async {
     final client = _http;
     final sessionBase = config.baseUrl.replaceAll('/v1', '');
     final uri = Uri.parse('$sessionBase/api/sessions');
@@ -109,12 +109,16 @@ class HermesApi {
         final data = jsonDecode(body) as Map<String, dynamic>;
         return List<Map<String, dynamic>>.from(data['data'] ?? []);
       }
-    } catch (_) {}
+      if (throwOnError) {
+        throw HttpException('getSessions HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      if (throwOnError) rethrow;
+    }
     return [];
   }
 
-  /// 加载某个会话的历史消息
-  Future<List<Map<String, dynamic>>> getSessionMessages(String sessionId, {int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getSessionMessages(String sessionId, {int limit = 20, bool throwOnError = false}) async {
     final client = _http;
     final sessionBase = config.baseUrl.replaceAll('/v1', '');
     final uri = Uri.parse('$sessionBase/api/sessions/$sessionId/messages?limit=$limit');
@@ -129,7 +133,12 @@ class HermesApi {
         final data = jsonDecode(body) as Map<String, dynamic>;
         return List<Map<String, dynamic>>.from(data['data'] ?? []);
       }
-    } catch (_) {}
+      if (throwOnError) {
+        throw HttpException('getSessionMessages HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      if (throwOnError) rethrow;
+    }
     return [];
   }
 

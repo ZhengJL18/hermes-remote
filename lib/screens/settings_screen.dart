@@ -43,6 +43,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       ref.read(baseUrlProvider.notifier).state = _urlCtrl.text.trim();
       ref.read(apiProvider).setBaseUrl(_urlCtrl.text.trim(), apiKey: _keyCtrl.text.trim());
+      // 递增配置版本号，通知 chat_screen 重新探测
+      ref.read(configVersionProvider.notifier).state++;
       Navigator.pop(context);
     }
   }

@@ -33,6 +33,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _rttTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshRtt());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 监听配置变更（Settings保存后递增版本号，触发重新探测）
+    ref.listen(configVersionProvider, (prev, next) {
+      if (prev != null && next > prev) {
+        _probeChannel();
+      }
+    });
+  }
+
   Timer? _rttTimer;
 
   Future<void> _probeChannel() async {
@@ -89,10 +100,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (baseUrl.isEmpty) return;
     final stopwatch = Stopwatch()..start();
     int ok = 0;
+    final healthUrl = baseUrl.replaceAll('/v1', '') + '/health';
     final futures = List.generate(3, (_) async {
       try {
         final c = HttpClient()..connectionTimeout = const Duration(seconds: 2);
-        final r = await c.getUrl(Uri.parse('$baseUrl/health'));
+        final r = await c.getUrl(Uri.parse(healthUrl));
         r.headers.set('Authorization', 'Bearer ${ref.read(apiProvider).config.apiKey}');
         final resp = await r.close().timeout(const Duration(seconds: 2));
         c.close();

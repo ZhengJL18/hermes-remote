@@ -27,6 +27,7 @@ class ConnectionManager {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
+    _retryCount = _retryCount.clamp(0, 10);
     final delay = Duration(milliseconds: (1000 * (1 << _retryCount)).clamp(0, 30000));
     _retryCount++;
     _reconnectTimer = Timer(delay, () {
