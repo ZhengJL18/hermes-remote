@@ -31,13 +31,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollController.addListener(_onScroll);
     _probeChannel();
     _rttTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshRtt());
-    // 监听配置变更（Settings保存后递增版本号，触发重新探测）
-    ref.listen(configVersionProvider, (prev, next) {
-      if (prev != null && next > prev) {
-        debugPrint('[Hermes] configVersion changed: $prev -> $next, re-probing...');
-        _probeChannel();
-      }
-    });
   }
 
   Timer? _rttTimer;
@@ -217,6 +210,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听配置变更（Settings保存后递增版本号，触发重新探测）
+    ref.listen(configVersionProvider, (prev, next) {
+      if (prev != null && next > prev) {
+        _probeChannel();
+      }
+    });
+
     final messages = ref.watch(messagesProvider);
     final isGenerating = ref.watch(isGeneratingProvider);
     final sessionId = ref.watch(sessionIdProvider);
