@@ -10,9 +10,11 @@ import '../config/api_config.dart';
 import '../services/hermes_api.dart';
 import '../services/relay_client.dart';
 import '../services/connection_manager.dart';
+import '../services/chat_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final relayProvider = Provider<RelayClient>((ref) => RelayClient());
+final dbProvider = Provider<ChatDatabase>((ref) => ChatDatabase());
 
 final apiProvider = Provider<HermesApi>((ref) => HermesApi());
 final baseUrlProvider = StateProvider<String>((ref) => ApiConfig.defaultUrl);
@@ -154,22 +156,46 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     if (_pendingQueue.isNotEmpty) _flushPending(ref);
   }
 
-  /// 加载会话
+  /// 加载会话 — 本地数据库优先，再云端同步
   Future<void> loadSession(String sessionId, {WidgetRef? ref}) async {
     _currentSessionId = sessionId;
-    // 先从缓存加载
-    final cached = await _loadCache(sessionId);
-    if (cached.isNotEmpty && state.isEmpty) state = cached;
+    final db = ref?.read(dbProvider) ?? ChatDatabase();
 
+    // 1. 先从本地数据库加载（秒开）
+    final localMsgs = await db.loadMessages(sessionId);
+    if (localMsgs.isNotEmpty) {
+      state = localMsgs;
+      _lastMessageCount = localMsgs.length;
+    }
+
+    // 2. 后台从云端同步最新消息
     try {
-      final allMessages = await _api.getSessionMessages(sessionId, limit: _pageSize);
-      final parsed = _parseMessages(allMessages, sessionId);
-      state = parsed;
-      _lastMessageCount = allMessages.length;
-      _hasMore = allMessages.length >= _pageSize;
-      ref?.read(hasMoreProvider.notifier).state = _hasMore;
-      _saveCache(sessionId, parsed);
-    } catch (e) { /* ignore */ }
+      final cloudMsgs = await _api.getSessionMessages(sessionId, limit: 200);
+      final parsed = _parseMessages(cloudMsgs, sessionId);
+      if (parsed.isNotEmpty) {
+        state = parsed;
+        _lastMessageCount = cloudMsgs.length;
+        _hasMore = cloudMsgs.length >= 200;
+        ref?.read(hasMoreProvider.notifier).state = _hasMore;
+        // 写入本地数据库
+        db.saveMessages(sessionId, parsed);
+      }
+    } catch (_) {}
+  }
+
+  /// 从云端同步会话列表到本地数据库
+  Future<List<Map<String, dynamic>>> syncSessions() async {
+    final db = ChatDatabase();
+    try {
+      final sessions = await _api.getSessions();
+      for (final s in sessions) {
+        await db.saveSession(s);
+      }
+      return sessions;
+    } catch (_) {
+      // cloud failed, return local
+      return db.getSessions();
+    }
   }
 
   Future<void> _saveCache(String sessionId, List<ChatMessage> msgs) async {

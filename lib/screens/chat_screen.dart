@@ -62,6 +62,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(connectionStateProvider.notifier).state = GatewayState.open;
 
       ref.read(messagesProvider.notifier).tryFlushPending(ref);
+      // 同步会话列表到本地数据库
+      ref.read(messagesProvider.notifier).syncSessions();
       final lastSid = ref.read(sessionIdProvider);
       final msgs = ref.read(messagesProvider);
       if (lastSid != null && msgs.isEmpty) {
