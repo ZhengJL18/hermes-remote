@@ -58,14 +58,14 @@ class ApiConfig {
 
     final futures = candidates.map((url) async {
       try {
-        final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+        final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
         final stopwatch = Stopwatch()..start();
         final request = await client.getUrl(Uri.parse('${url.replaceAll('/v1', '')}/health'));
         request.headers.set('Authorization', 'Bearer $defaultApiKey');
-        final response = await request.close().timeout(const Duration(seconds: 3));
+        final response = await request.close().timeout(const Duration(seconds: 5));
         final rtt = stopwatch.elapsedMilliseconds;
         client.close();
-        if (response.statusCode == 200 && rtt < 1000) return (url, rtt);
+        if (response.statusCode == 200 && rtt < 5000) return (url, rtt);
       } catch (_) {}
       return null;
     }).toList();
