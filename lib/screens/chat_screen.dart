@@ -47,7 +47,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     try {
       final stopwatch = Stopwatch()..start();
-      final best = await ApiConfig.probe(preferUrl: saved.baseUrl);
+      final best = await ApiConfig.probe(preferUrl: saved.baseUrl, apiKey: saved.apiKey);
       final rtt = stopwatch.elapsedMilliseconds;
       _lastProbeTime = DateTime.now();
 

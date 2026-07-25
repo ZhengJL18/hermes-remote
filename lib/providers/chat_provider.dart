@@ -48,35 +48,91 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   Timer? _relayPollTimer;
   final RelayClient _relay = RelayClient();
 
+  /// 轮询最大次数（10s*30=5分钟超时）
+  static const _maxPollAttempts = 30;
+  /// 重试最大次数
+  static const _maxRetryAttempts = 5;
+  int _pollAttempts = 0;
+  int _retryAttempts = 0;
+  bool _isPolling = false;
+  int _pollGeneration = 0;             // [FIX-12] 每次开始/停止poll都自增；
+                                        //   回调里比对代次，代次不符说明是"过期回调"，直接丢弃，
+                                        //   防止 Timer.cancel() 无法打断的"已在执行中"的异步调用
+                                        //   在会话切换后污染新会话的最后一条消息。
+
   ChatNotifier(this._api) : super([]);
 
-  /// 启动 relay 轮询（拉取回复 + 发送心跳）
-  void startRelayPoll(WidgetRef ref) {
-    _relay.heartbeat();
-    _relayPollTimer?.cancel();
+  void _updatePlaceholder(String newContent, {bool isStreaming = false, String? messageId}) {
+    // [FIX-12] 优先按 id 精确匹配；没传 id 时才退化为"最后一条"（保留旧调用点兼容）
+    final idx = messageId != null
+        ? state.indexWhere((m) => m.id == messageId)
+        : state.length - 1;
+    if (idx >= 0 && state[idx].role == MessageRole.assistant) {
+      state = [...state.sublist(0, idx),
+        state[idx].copyWith(content: newContent, isStreaming: isStreaming),
+        ...state.sublist(idx + 1)];
+    }
+  }
+
+  /// 启动 relay 轮询（拉取回复 + 心跳）
+  void startRelayPoll(WidgetRef ref, {String? messageId}) {
+    _relayPollTimer?.cancel();  // 取消旧定时器防止重叠
+    _pollAttempts = 0;
+    _isPolling = true;
+    ref.read(isGeneratingProvider.notifier).state = true; // [FIX-10] 每次开poll都显式上锁,
+                                                            //   不依赖调用方记得设置
+    final myGeneration = ++_pollGeneration;  // [FIX-12] 记录本轮poll的代次
+
     _relayPollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      // 代次已变(被stopRelayPoll或新一轮poll取代) → 这是过期回调,直接丢弃结果
+      if (myGeneration != _pollGeneration) return;
+
+      _pollAttempts++;
+      final sid = _currentSessionId;
+      if (sid == null) return;
+
       _relay.heartbeat();
-      // 获取电脑状态
-      final st = await _relay.status();
-      ref.read(relayStatusProvider.notifier).state = st;
-      // 获取回复
-      final replies = await _relay.fetch(sessionId: _currentSessionId);
+      final statusResult = await _relay.status();
+      if (myGeneration != _pollGeneration) return; // await期间可能已经过期,再check一次
+      // [集成说明] relay_client.dart 修复版把 status()/fetch() 的返回类型
+      // 改成了 RelayResult<T>，以区分"没有数据"和"请求失败/401"，这里同步适配。
+      if (statusResult.ok && statusResult.data != null) {
+        ref.read(relayStatusProvider.notifier).state = statusResult.data!;
+      }
+
+      final fetchResult = await _relay.fetch(sessionId: sid);
+      if (myGeneration != _pollGeneration) return; // await期间可能已经过期,再check一次
+      if (!fetchResult.ok) return; // 这一轮请求失败，等下一次tick再试，不当成"没有回复"处理
+      final replies = fetchResult.data ?? [];
       for (final r in replies) {
         if (r['role'] == 'assistant' && r['content'] != null) {
-          // 替换最后一个 assistant 占位或新增
-          final lastIdx = state.length - 1;
-          if (lastIdx >= 0 && state[lastIdx].role == MessageRole.assistant && state[lastIdx].content.isEmpty) {
-            state = [...state.sublist(0, lastIdx), state[lastIdx].copyWith(content: r['content'].toString(), isStreaming: false)];
-          } else {
-            state = [...state, ChatMessage.assistant(r['content'].toString(), sessionId: _currentSessionId)];
-          }
+          _updatePlaceholder(r['content'].toString(), messageId: messageId);
+          _relayPollTimer?.cancel();
+          _isPolling = false;
+          ref.read(isGeneratingProvider.notifier).state = false;
+          return;
         }
+      }
+
+      if (_pollAttempts >= _maxPollAttempts) {
+        _updatePlaceholder('⚠️ 电脑长时间未响应', messageId: messageId);
+        _relayPollTimer?.cancel();
+        _isPolling = false;
+        ref.read(isGeneratingProvider.notifier).state = false;
       }
     });
   }
 
-  void stopRelayPoll() {
+  // [FIX-11] 必须传 ref 才能真正释放发送锁；_isPolling 也要重置，
+  // 否则切会话后 sendMessage 的 finally 逻辑会永远判断"还在poll中"而拒绝释放锁，
+  // 造成发送功能永久锁死。同时代次自增，让任何还没跑完的旧poll回调自动失效。
+  void stopRelayPoll(WidgetRef ref) {
     _relayPollTimer?.cancel();
+    _pollGeneration++;
+    if (_isPolling) {
+      _isPolling = false;
+      ref.read(isGeneratingProvider.notifier).state = false;
+    }
   }
 
   /// 发送消息（优先 relay，回退直连）
@@ -84,82 +140,136 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     if (ref.read(isGeneratingProvider)) return;
     if (text.trim().isEmpty) return;
 
+    _currentSessionId = sessionId;
     final userMsg = ChatMessage.user(text, sessionId: sessionId);
     state = [...state, userMsg];
+    _lastMessageCount = state.length;
+
+    // [FIX-2] 先构建不含占位符的上下文
+    final ctxMessages = _buildContext();
+
     final assistantMsg = ChatMessage.assistant('☁️ 排队中...', sessionId: sessionId);
     state = [...state, assistantMsg];
-    _lastMessageCount = state.length;
     ref.read(isGeneratingProvider.notifier).state = true;
 
-    // 先发到 relay（云端队列）
-    final relayOk = await _relay.send(text, sessionId: sessionId);
-    if (relayOk) {
-      startRelayPoll(ref);
-      ref.read(isGeneratingProvider.notifier).state = false;
-      return;
-    }
-
-    // relay 失败 → 走直连 SSE（回退）
     try {
-      final messages = _buildMessages();
-      final stream = _api.chatStream(messages: messages, sessionId: sessionId);
+      // [FIX-7] _relay.send 包 try/catch
+      bool relayOk = false;
+      try {
+        relayOk = await _relay.send(text, sessionId: sessionId);
+      } catch (_) {
+        relayOk = false;
+      }
+
+      if (relayOk) {
+        // [FIX-3] relay 成功→开 poll 等回复
+        //    关键：不在这里释放 isGenerating!
+        //    等 poll 拿到真正的 AI 回复后才释放
+        //    _isPolling/isGeneratingProvider 现在统一由 startRelayPoll 自己设置
+        startRelayPoll(ref, messageId: assistantMsg.id);
+        return;
+      }
+
+      // relay 失败 → SSE 直连
+      final stream = _api.chatStream(messages: ctxMessages, sessionId: sessionId);
       await for (final chunk in stream) {
-        final lastIdx = state.length - 1;
         if (chunk.content != null) {
-          state = [...state.sublist(0, lastIdx),
-            state[lastIdx].copyWith(content: state[lastIdx].content.replaceFirst('☁️ 排队中...', '') + chunk.content!, isStreaming: true)];
+          final idx = state.length - 1;
+          if (idx >= 0 && state[idx].role == MessageRole.assistant) {
+            state = [...state.sublist(0, idx),
+              state[idx].copyWith(content: state[idx].content + chunk.content!, isStreaming: true),
+              ...state.sublist(idx + 1)];
+          }
         }
         if (chunk.finishReason != null) {
-          state = [...state.sublist(0, lastIdx), state[lastIdx].copyWith(isStreaming: false)];
+          final idx = state.length - 1;
+          if (idx >= 0 && state[idx].role == MessageRole.assistant) {
+            state = [...state.sublist(0, idx), state[idx].copyWith(isStreaming: false), ...state.sublist(idx + 1)];
+          }
         }
       }
-      _lastMessageCount = state.length;
     } catch (e) {
-      if (_pendingQueue.length < 50) _pendingQueue.add({'text': text, 'sessionId': sessionId});
-      state = [...state.sublist(0, state.length - 1)];
+      _updatePlaceholder('⚠️ 发送失败，稍后重试');
+      // [FIX-8] 去重
+      final dup = _pendingQueue.any((m) => m['text'] == text && m['sessionId'] == sessionId);
+      if (!dup && _pendingQueue.length < 50) {
+        _pendingQueue.add({'text': text, 'sessionId': sessionId, 'messageId': assistantMsg.id});
+      }
       _startRetryTimer(ref);
     } finally {
-      ref.read(isGeneratingProvider.notifier).state = false;
+      // [FIX-1] finally 兜底释放 isGenerating
+      if (!_isPolling) {
+        ref.read(isGeneratingProvider.notifier).state = false;
+      }
       ref.read(pendingCountProvider.notifier).state = _pendingQueue.length;
     }
   }
 
-  List<Map<String, String>> _buildMessages() {
+  List<Map<String, String>> _buildContext() {
     final messages = <Map<String, String>>[];
     final src = state.length > 30 ? state.sublist(state.length - 30) : state;
     for (final msg in src) {
       final role = msg.role.name;
       if (msg.content.isEmpty) continue;
+      if (msg.content.startsWith('☁️')) continue;  // 跳过占位符
       if (role == 'user' && (msg.content.startsWith('[CONTEXT COMPACTION') || msg.content.startsWith('[skill_') || msg.content.startsWith('Conversation started:'))) continue;
-      final content = role == 'tool' && msg.content.length > 200 ? '${msg.content.substring(0, 200)}...' : msg.content;
-      messages.add({'role': role, 'content': content});
+      messages.add({'role': role, 'content': msg.content});
     }
     return messages;
   }
 
   void _startRetryTimer(WidgetRef ref) {
     _retryTimer?.cancel();
-    _retryTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_pendingQueue.isNotEmpty) _flushPending(ref);
-      else _retryTimer?.cancel();
+    _retryAttempts = 0;
+    _retryTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      _retryAttempts++;
+      if (_pendingQueue.isEmpty || _retryAttempts > _maxRetryAttempts) {
+        timer.cancel();
+        _retryTimer = null;
+        for (final item in _pendingQueue) {
+          _updatePlaceholder('❌ 重试失败，请手动重发');
+        }
+        _pendingQueue.clear();
+        ref.read(pendingCountProvider.notifier).state = 0;
+        ref.read(isGeneratingProvider.notifier).state = false;
+        return;
+      }
+      _flushPending(ref);
     });
   }
 
+  /// [FIX-6] flush 不再调 sendMessage，直接重发 relay + 重启 poll
   Future<void> _flushPending(WidgetRef ref) async {
-    if (_pendingQueue.isEmpty) return;
-    final batch = List<Map<String, dynamic>>.from(_pendingQueue);
-    for (final item in batch) {
-      try {
-        await sendMessage(item['text'], sessionId: item['sessionId'], ref: ref);
+    final items = List<Map<String, dynamic>>.from(_pendingQueue);
+    for (final item in items) {
+      final text = item['text'] as String;
+      final sessionId = item['sessionId'] as String?;
+      final messageId = item['messageId'] as String?;
+      bool ok = false;
+      try { ok = await _relay.send(text, sessionId: sessionId); } catch (_) { ok = false; }
+      if (ok) {
         _pendingQueue.remove(item);
         ref.read(pendingCountProvider.notifier).state = _pendingQueue.length;
-      } catch (_) { break; }
+        // [FIX-10] 重发对应的是它自己排队时的 sessionId，不是当前全局 _currentSessionId
+        _currentSessionId = sessionId;
+        _updatePlaceholder('已重发，等待回复...', messageId: messageId);
+        startRelayPoll(ref, messageId: messageId);  // 会自动把 isGenerating 重新上锁
+        return;               // 一次只发一条
+      }
     }
   }
 
   /// 连接恢复时触发重试
   void tryFlushPending(WidgetRef ref) {
     if (_pendingQueue.isNotEmpty) _flushPending(ref);
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    _relayPollTimer?.cancel();
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   /// 加载会话 — 本地数据库优先，再云端同步
@@ -362,12 +472,5 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   void stopPolling() {
     _pollTimer?.cancel();
     _pollSessionId = null;
-  }
-
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    _retryTimer?.cancel();
-    super.dispose();
   }
 }
